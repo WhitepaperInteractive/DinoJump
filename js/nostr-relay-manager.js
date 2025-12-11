@@ -1,56 +1,62 @@
+// js/nostr-relay-manager.js
+
 class NostrRelayManager {
-  constructor(config){
+  constructor(config) {
     this.config = config;
-    this.ndk = null;
-    this.sub = null;
+    this.pool = null;    // nostr-tools SimplePool
+    this.unsubscribe = null;
   }
 
-  async initialize(){
+  async initialize() {
     try {
-      // NDK is provided globally by the UMD bundle
-      this.ndk = new NDK({
-        explicitRelayUrls: this.config.relays
-      });
-      await this.ndk.connect(this.config.relayTimeout);
+      if (!window.NostrTools || !NostrTools.SimplePool) {
+        console.error("nostr-tools not loaded — NostrTools.SimplePool missing");
+        return false;
+      }
+
+      const { SimplePool } = NostrTools;
+      this.pool = new SimplePool();
       return true;
     } catch (e) {
-      console.error("NDK init error", e);
+      console.error("nostr-tools init error", e);
       return false;
     }
   }
 
-  validateZapReceipt(event, expectedAmountSats){
+  // Basic zap receipt validation
+  validateZapReceipt(event, expectedAmountSats) {
     try {
-      if (event.kind !== 9735) return { valid:false, reason:"not kind 9735" };
+      if (event.kind !== 9735) return { valid: false, reason: "not kind 9735" };
 
       const pTag = (event.tags.find(t => t[0] === "p") || [])[1];
-      if (!pTag) return { valid:false, reason:"missing p tag" };
+      if (!pTag) return { valid: false, reason: "missing p tag" };
 
       if (this.config.recipientNostrPubkey &&
           pTag !== this.config.recipientNostrPubkey) {
-        return { valid:false, reason:"recipient pubkey mismatch" };
+        return { valid: false, reason: "recipient pubkey mismatch" };
       }
 
-      const descriptionTag = (event.tags.find(t => t[0] === "description") || [])[1];
+      // default to expected, adjust if we can parse from zap request
       let amountSats = expectedAmountSats;
 
-      if (descriptionTag) {
+      const descTag = (event.tags.find(t => t[0] === "description") || [])[1];
+      if (descTag) {
         try {
-          const zapReq = JSON.parse(descriptionTag);
-          const amountTag = (zapReq.tags || []).find(t => t[0] === "amount");
-          if (amountTag) {
-            const msats = parseInt(amountTag[1], 10);
+          const zapReq = JSON.parse(descTag);
+          const amtTag = (zapReq.tags || []).find(t => t[0] === "amount");
+          if (amtTag) {
+            const msats = parseInt(amtTag[1], 10);
             if (!Number.isNaN(msats)) {
               amountSats = Math.floor(msats / 1000);
             }
           }
         } catch (e) {
-          // ignore parse errors, fall back to expectedAmountSats
+          // ignore JSON parse errors, keep expectedAmountSats
         }
       }
 
       if (amountSats < this.config.minPaymentSats) {
-        return { valid:false, reason:"amount too low", amountSats };
+        return { valid: false, reason: "amount too low", amountSats };
       }
 
       return {
@@ -60,11 +66,17 @@ class NostrRelayManager {
         eventId: event.id
       };
     } catch (e) {
-      return { valid:false, reason:e.message || "validation error" };
+      return { valid: false, reason: e.message || "validation error" };
     }
   }
 
-  listenForZapReceipt(expectedAmountSats, onReceived){
+  // Listen for zap receipts (kind 9735) to recipient pubkey
+  listenForZapReceipt(expectedAmountSats, onReceived) {
+    if (!this.pool) {
+      console.warn("listenForZapReceipt called before initialize()");
+      return () => {};
+    }
+
     const since = Math.floor(Date.now() / 1000) - 30;
 
     const filter = {
@@ -73,19 +85,30 @@ class NostrRelayManager {
       since
     };
 
-    const sub = this.ndk.subscribe(filter, { closeOnEose: false }, (ev) => {
-      const verdict = this.validateZapReceipt(ev, expectedAmountSats);
-      if (verdict.valid) {
-        onReceived(verdict);
-        try { sub(); } catch (e) {}
-      } else {
-        console.log("ignoring zap", verdict.reason);
+    // subscribeMany relays for zap receipts
+    const sub = this.pool.subscribeMany(
+      this.config.relays,
+      [filter],
+      {
+        onevent: (event) => {
+          const verdict = this.validateZapReceipt(event, expectedAmountSats);
+          if (verdict.valid) {
+            onReceived(verdict);
+            try { sub.close(); } catch (e) {}
+          } else {
+            console.log("Ignoring zap:", verdict.reason);
+          }
+        },
+        oneose: () => {
+          // We don't auto-close; we wait for a zap or a manual timeout in game.js
+        }
       }
-    });
+    );
 
-    this.sub = sub;
-    return () => {
-      try { sub(); } catch (e) {}
+    this.unsubscribe = () => {
+      try { sub.close(); } catch (e) {}
     };
+
+    return this.unsubscribe;
   }
 }
