@@ -3,28 +3,73 @@
 <head>
   <meta charset="utf-8" />
   <title>SatSnake Pay-to-Play Demo (21 sats)</title>
+
+  <!-- QRCode generator -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="https://unpkg.com/@nostr-dev-kit/ndk@latest/lib/index.umd.js"></script>
+  <!-- Nostr Dev Kit UMD (NDK global) -->
+  <script src="https://unpkg.com/@nostr-dev-kit/ndk@2.5.2/lib/index.umd.js"></script>
+
   <style>
-    body{font-family:Arial,system-ui;background:#0f0f0f;color:#fff;display:flex;flex-direction:column;align-items:center;padding:30px}
-    #panel{background:#111;border:2px solid #f7931a;padding:20px;border-radius:10px;width:420px;text-align:center}
-    button{padding:10px 16px;margin:8px;border-radius:6px;border:none;cursor:pointer}
-    .primary{background:#f7931a;color:#000;font-weight:700}
-    #qr{margin:12px auto}
-    #status{margin-top:12px;color:#bbb}
+    body{
+      font-family:Arial,system-ui;
+      background:#0f0f0f;
+      color:#fff;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      padding:30px;
+    }
+    #panel{
+      background:#111;
+      border:2px solid #f7931a;
+      padding:20px;
+      border-radius:10px;
+      width:420px;
+      text-align:center;
+    }
+    button{
+      padding:10px 16px;
+      margin:8px;
+      border-radius:6px;
+      border:none;
+      cursor:pointer;
+    }
+    .primary{
+      background:#f7931a;
+      color:#000;
+      font-weight:700;
+    }
+    #qr{margin:12px auto;}
+    #status{margin-top:12px;color:#bbb;min-height:1.2em;}
+    code{
+      background:#111;
+      padding:2px 4px;
+      border-radius:4px;
+    }
   </style>
 </head>
 <body>
   <h1>SatSnake — Pay 21 sats to play</h1>
+
   <div id="panel">
-    <p>Pay <strong>21 sats</strong> to unlock the demo. Lightning Address: <code>mustardmoose1@primal.net</code></p>
-    <button id="generate" class="primary">Generate 21 sats invoice</button>
+    <p>
+      Scan &amp; pay <strong>21 sats</strong> to unlock the demo.<br/>
+      Fixed-amount LNURL for:<br/>
+      <code>mustardmoose1@primal.net</code>
+    </p>
+
+    <button id="generate" class="primary">Show 21-sat payment QR</button>
     <div id="qr"></div>
     <div id="amount"></div>
-    <button id="copy" style="display:none">Copy invoice</button>
+    <button id="copy" style="display:none">Copy payment link</button>
+
     <div id="status">Idle</div>
   </div>
-  <canvas id="gameCanvas" width="320" height="240" style="margin-top:20px;border:2px solid #f7931a;background:#111"></canvas>
+
+  <canvas id="gameCanvas" width="320" height="240"
+          style="margin-top:20px;border:2px solid #f7931a;background:#111"></canvas>
+
+  <!-- App scripts (load after libs) -->
   <script src="js/config.js"></script>
   <script src="js/lightning-payment.js"></script>
   <script src="js/nostr-relay-manager.js"></script>

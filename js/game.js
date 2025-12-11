@@ -1,34 +1,60 @@
-document.addEventListener("DOMContentLoaded", async ()=>{
-  const cfg=SATSNAKE_CONFIG;
-  const lm=new LightningPaymentManager(cfg);
-  const nm=new NostrRelayManager(cfg);
-  nm.initialize();
+document.addEventListener("DOMContentLoaded", async () => {
+  const cfg = SATSNAKE_CONFIG;
+  const lm = new LightningPaymentManager(cfg);
+  const nm = new NostrRelayManager(cfg);
 
-  const g=document.getElementById("generate");
-  const qr=document.getElementById("qr");
-  const amount=document.getElementById("amount");
-  const copy=document.getElementById("copy");
-  const status=document.getElementById("status");
+  const generateBtn = document.getElementById("generate");
+  const qrContainer = document.getElementById("qr");
+  const amountEl = document.getElementById("amount");
+  const copyBtn = document.getElementById("copy");
+  const statusEl = document.getElementById("status");
 
-  g.onclick=async ()=>{
-    status.textContent="Generating invoice…";
-    try{
-      const r=await lm.initiatePayment(cfg.minPaymentSats);
-      lm.displayQrCode(r.invoice,qr);
-      amount.textContent=`Amount: ${r.amountSats} sats`;
-      copy.style.display="inline-block";
-      copy.onclick=()=>navigator.clipboard.writeText(r.invoice);
+  let unsubscribe = null;
 
-      status.textContent="Waiting for zap…";
+  const ndkReady = await nm.initialize();
+  statusEl.textContent = ndkReady
+    ? "Ready. Click the button, scan & pay 21 sats."
+    : "Relay connect issue. You can still try paying; we may or may not see the zap.";
 
-      nm.listenForZapReceipt(r.sessionId,r.amountSats,(zap)=>{
-        status.textContent="✓ Payment received — unlocked!";
-        const c=document.getElementById("gameCanvas");
-        const ctx=c.getContext("2d");
-        ctx.fillStyle="#0f0"; ctx.fillRect(0,0,320,240);
-        ctx.fillStyle="#000"; ctx.font="20px monospace";
-        ctx.fillText("UNLOCKED!",80,120);
-      });
-    }catch(e){ status.textContent="Error: "+e.message; }
-  };
+  generateBtn.addEventListener("click", () => {
+    // Show the static LNURL-pay QR
+    lm.displayQrCode(qrContainer);
+    amountEl.textContent = `Amount: ${cfg.minPaymentSats} sats`;
+
+    copyBtn.style.display = "inline-block";
+    copyBtn.textContent = "Copy payment link";
+    copyBtn.onclick = async () => {
+      const ok = await lm.copyPaymentUriToClipboard();
+      copyBtn.textContent = ok ? "Copied!" : "Copy failed";
+      setTimeout(() => (copyBtn.textContent = "Copy payment link"), 1500);
+    };
+
+    statusEl.textContent = "Scan in your wallet & pay 21 sats… Listening for zap receipt…";
+
+    if (unsubscribe) unsubscribe();
+    unsubscribe = nm.listenForZapReceipt(cfg.minPaymentSats, (zap) => {
+      statusEl.textContent = `✓ Payment received: ${zap.amountSats} sats — unlocked!`;
+
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#0f0";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#000";
+      ctx.font = "20px monospace";
+      ctx.fillText("UNLOCKED — enjoy!", 40, canvas.height / 2);
+
+      qrContainer.innerHTML = "";
+      copyBtn.style.display = "none";
+    });
+
+    setTimeout(() => {
+      if (statusEl.textContent.includes("Listening for zap")) {
+        statusEl.textContent = "Timed out waiting for zap receipt. You can still refresh & try again.";
+      }
+    }, cfg.zapReceiptTimeout + 2000);
+  });
+
+  window.addEventListener("beforeunload", () => {
+    if (unsubscribe) unsubscribe();
+  });
 });
