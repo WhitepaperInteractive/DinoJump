@@ -1,3 +1,4 @@
+// js/lightning-payment.js
 class LightningPaymentManager {
   constructor(config){
     this.config = config;
@@ -13,8 +14,8 @@ class LightningPaymentManager {
     const uri = this.getPaymentUri();
     new QRCode(containerEl, {
       text: uri,
-      width: 200,
-      height: 200
+      width: 240,   // slightly larger, helps some scanners
+      height: 240
     });
   }
 

@@ -18,8 +18,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   generateBtn.addEventListener("click", () => {
     // Show the static LNURL-pay QR
-    lm.displayQrCode(qrContainer);
-    amountEl.textContent = `Amount: ${cfg.minPaymentSats} sats`;
+    //OLD CODE: lm.displayQrCode(qrContainer);
+    //OLD CODE: amountEl.textContent = `Amount: ${cfg.minPaymentSats} sats`;
+
+    // inside generateBtn.addEventListener("click", ...)
+lm.displayQrCode(qrContainer);
+amountEl.innerHTML = `
+  Amount: ${cfg.minPaymentSats} sats<br/>
+  <small>${cfg.lnurlUri}</small>
+`;
+
 
     copyBtn.style.display = "inline-block";
     copyBtn.textContent = "Copy payment link";
