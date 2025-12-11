@@ -1,264 +1,43 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pay-to-Play Demo: Unlock Content with 21 Sats Zap</title>
-    <script src="https://unpkg.com/nostr-tools@2.19.2/polyfills.js"></script>
-    <script src="https://unpkg.com/nostr-tools@2.19.2/index.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            text-align: center;
-        }
-        #pay-section {
-            margin: 20px 0;
-        }
-        #confirmation {
-            display: none;
-            background: #e8f5e8;
-            padding: 20px;
-            border-radius: 8px;
-            margin-top: 20px;
-        }
-        #qr-code {
-            margin: 20px 0;
-        }
-        button {
-            background: #f39c12;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
-            border-radius: 4px;
-        }
-        button:hover {
-            background: #e67e22;
-        }
-        button:disabled {
-            background: #bdc3c7;
-            cursor: not-allowed;
-        }
-    </style>
+  <meta charset="utf-8" />
+  <title>SatSnake Pay-to-Play Demo (21 sats)</title>
+
+  <!-- qrcode lib -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <!-- NDK (Nostr Dev Kit) UMD -->
+  <script src="https://unpkg.com/@nostr-dev-kit/ndk@latest/lib/index.umd.js"></script>
+
+  <style>
+    body{font-family:Arial,system-ui;background:#0f0f0f;color:#fff;display:flex;flex-direction:column;align-items:center;padding:30px}
+    #panel{background:#111;border:2px solid #f7931a;padding:20px;border-radius:10px;width:420px;text-align:center}
+    button{padding:10px 16px;margin:8px;border-radius:6px;border:none;cursor:pointer}
+    .primary{background:#f7931a;color:#000;font-weight:700}
+    #qr{margin:12px auto}
+    #status{margin-top:12px;color:#bbb}
+    code{background:#111;padding:6px;border-radius:4px;display:block;margin-top:8px;word-break:break-all}
+  </style>
 </head>
 <body>
-    <h1>Pay-to-Play Demo</h1>
-    <p>Send a zap of exactly 21 sats to <strong>mustardmoose1@primal.net</strong> to unlock the secret content!</p>
-    <div id="pay-section">
-        <p>Click to generate your zap QR code.</p>
-        <button id="generate-btn">Generate Zap QR</button>
-        <div id="qr-code"></div>
-        <p id="la-status">Waiting for payment...</p>
-    </div>
-    <div id="confirmation">
-        <h2>Payment Confirmed! 🎉</h2>
-        <p>Thank you for the 21 sats zap. Here's your exclusive content:</p>
-        <p><em>Secret: You've successfully demonstrated NIP-57 zap integration for pay-to-play!</em></p>
-    </div>
+  <h1>SatSnake — Pay 21 sats to play</h1>
+  <div id="panel">
+    <p>Pay <strong>21 sats</strong> to unlock the demo. Lightning Address: <code>mustardmoose1@primal.net</code></p>
 
-    <script>
-        const RECIPIENT_LNURL = 'mustardmoose1@primal.net';
-        const AMOUNT_MSATS = 2100; // 21 sats = 2100 msats
-        const paySection = document.getElementById('pay-section');
-        const confirmation = document.getElementById('confirmation');
-        const qrDiv = document.getElementById('qr-code');
-        const statusP = document.getElementById('la-status');
-        const generateBtn = document.getElementById('generate-btn');
+    <button id="generate" class="primary">Generate 21 sats invoice</button>
+    <div id="qr"></div>
+    <div id="amount"></div>
+    <button id="copy" style="display:none">Copy invoice</button>
 
-        let pool;
-        let subscription;
-        let zapRequestEventId;
-        let zapperPubkey;
-        let zapperEvent;
+    <div id="status">Idle</div>
+  </div>
 
-        // Generate a unique comment for the zap request
-        const comment = `Pay-to-play demo zap for 21 sats on ${new Date().toISOString()}`;
+  <canvas id="gameCanvas" width="320" height="240" style="margin-top:20px;border:2px solid #f7931a;background:#111"></canvas>
 
-        // Create a dummy event ID and zapper pubkey for the request (since no target event, use placeholders)
-        // In a real zap to a profile, this would be the profile event ID; here we use a generated one
-        zapRequestEventId = 'paytoplaydemo_' + Date.now();
-        zapperPubkey = 'paytoplay_demo_pubkey_placeholder';
-
-        // Initialize Nostr pool
-        pool = new SimplePool();
-
-        // Connect to relays
-        const pubs = pool.publish(RELAYS);
-        const subs = pool.subscribe(RELAYS);
-
-        const RELAYS = [
-            'wss://relay.damus.io',
-            'wss://relay.nostr.band',
-            'wss://nostr-pub.wellorder.net',
-            'wss://relay.snort.social',
-            'wss://nos.lol'
-        ];
-
-        // Listen for zap receipts
-        subscription = subs.on('event', (event) => {
-            console.log('Received event:', event);
-            if (validateZapReceipt(event)) {
-                showConfirmation();
-                subscription.unsubscribe();
-            }
-        });
-
-        // Filter for zap receipts related to our zap request
-        const filter = {
-            kinds: [9735],
-            '#e': [zapRequestEventId]
-        };
-        subscription.sub(filter);
-
-        // Function to validate zap receipt (from NIP-57)
-        function validateZapReceipt(event) {
-            console.log('Validating receipt:', event);
-            if (event.kind !== 9735) return false;
-            const pTags = event.tags.filter(tag => tag[0] === 'p');
-            if (pTags.length !== 1) return false;
-            // For profile zap, the 'p' in receipt is the recipient's pubkey, but we don't have it; assume any is ok for demo
-            // In real: check if pTags[0][1] is the recipient's pubkey
-            const eTags = event.tags.filter(tag => tag[0] === 'e');
-            if (eTags.length > 0 && !eTags.some(tag => tag[1] === zapRequestEventId)) return false;
-            const bolt11Tag = event.tags.find(tag => tag[0] === 'bolt11');
-            if (!bolt11Tag) return false;
-            // Simplified amount check: look for msats in description or assume
-            // For demo, we'll check if amount is correct by parsing bolt11 if possible, but skip full decode
-            const preimageTag = event.tags.find(tag => tag[0] === 'preimage');
-            if (!preimageTag) return false;
-            // Additional: check description tag parses to the zap request event
-            const descTag = event.tags.find(tag => tag[0] === 'description');
-            if (descTag) {
-                try {
-                    const desc = JSON.parse(descTag[1]);
-                    if (desc.id !== zapRequestEventId || desc.pubkey !== zapperPubkey) return false;
-                } catch (e) {
-                    console.warn('Description parse error:', e);
-                    return false;
-                }
-            }
-            // Check amount from lnurl or tags
-            const lnurlTag = event.tags.find(tag => tag[0] === 'lnurl');
-            if (lnurlTag) {
-                // Extract amount from lnurl if needed, but for demo assume ok if other match
-            }
-            console.log('Receipt validated successfully');
-            return true;
-        }
-
-        // Show confirmation
-        function showConfirmation() {
-            paySection.style.display = 'none';
-            confirmation.style.display = 'block';
-        }
-
-        // Generate zap request and get invoice
-        async function generateZap() {
-            try {
-                statusP.textContent = 'Fetching invoice...';
-                generateBtn.disabled = true;
-
-                // Create zap request event (kind 9734)
-                let zapRequestEvent = {
-                    kind: 9734,
-                    content: comment,
-                    tags: [
-                        ['p', zapperPubkey], // payer's pubkey (placeholder)
-                        ['e', zapRequestEventId], // the "target" event id (our dummy)
-                        ['relays', ...RELAYS],
-                        ['amount', AMOUNT_MSATS.toString()]
-                    ],
-                    created_at: Math.floor(Date.now() / 1000)
-                };
-
-                // Sign the zap request if NIP-07 available, else anonymous
-                if (window.nostr) {
-                    try {
-                        zapRequestEvent = await window.nostr.signEvent(zapRequestEvent);
-                        console.log('Signed zap request:', zapRequestEvent);
-                    } catch (e) {
-                        console.warn('NIP-07 not available, using anonymous zap');
-                    }
-                } else {
-                    console.log('No NIP-07, anonymous zap');
-                }
-
-                // Prepare POST data for LNURL-pay
-                const lnurlParams = new URLSearchParams({
-                    amount: AMOUNT_MSATS,
-                    comment: comment,
-                    nostr: JSON.stringify(zapRequestEvent)
-                });
-
-                // Get the LNURL-pay URL (assumes primal.net handles @ to path)
-                const lnurlPayUrl = `https://lnurl.primal.net/lnurlp/${RECIPIENT_LNURL}`;
-                const invoiceUrl = `${lnurlPayUrl}?${lnurlParams}`;
-
-                console.log('Fetching invoice from:', invoiceUrl);
-
-                // Fetch the invoice (try text/plain first)
-                let response = await fetch(invoiceUrl, {
-                    method: 'GET',
-                    headers: { 'Accept': 'text/plain' }
-                });
-                let bolt11 = await response.text().trim();
-
-                if (bolt11.startsWith('lnbc') || bolt11.startsWith('lnp')) {
-                    // It's the bolt11 invoice
-                    qrDiv.innerHTML = '';
-                    new QRCode(qrDiv, {
-                        text: bolt11,
-                        width: 200,
-                        height: 200,
-                        colorDark: "#000000",
-                        colorLight: "#ffffff",
-                        correctLevel: QRCode.CorrectLevel.H
-                    });
-                    statusP.textContent = 'Scan and pay the QR code with your Lightning wallet.';
-                } else if (response.status === 404 || bolt11.includes('not found')) {
-                    // Fallback: try without nostr for simple invoice
-                    statusP.textContent = 'Advanced zap not supported, generating simple invoice...';
-                    const simpleUrl = `${lnurlPayUrl}?${new URLSearchParams({amount: AMOUNT_MSATS})}`;
-                    response = await fetch(simpleUrl, { headers: { 'Accept': 'text/plain' } });
-                    bolt11 = await response.text().trim();
-                    if (bolt11.startsWith('lnbc') || bolt11.startsWith('lnp')) {
-                        qrDiv.innerHTML = '';
-                        new QRCode(qrDiv, {
-                            text: bolt11,
-                            width: 200,
-                            height: 200,
-                            colorDark: "#000000",
-                            colorLight: "#ffffff",
-                            correctLevel: QRCode.CorrectLevel.H
-                        });
-                        statusP.textContent = 'Scan and pay the QR code (simple invoice - zap receipt may not be published).';
-                    } else {
-                        throw new Error('Failed to fetch invoice');
-                    }
-                } else {
-                    throw new Error('Unexpected response: ' + bolt11.substring(0, 100));
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                statusP.textContent = 'Error generating zap: ' + error.message + '. Check console.';
-            } finally {
-                generateBtn.disabled = false;
-            }
-        }
-
-        generateBtn.addEventListener('click', generateZap);
-
-        // Cleanup on unload
-        window.addEventListener('beforeunload', () => {
-            if (pool) {
-                pool.close(subs.relays);
-            }
-        });
-    </script>
+  <script src="js/config.js"></script>
+  <script src="js/nostr-relay-manager.js"></script>
+  <script src="js/lightning-payment.js"></script>
+  <script src="js/game.js"></script>
 </body>
 </html>
