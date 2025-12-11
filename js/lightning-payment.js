@@ -1,25 +1,28 @@
-// js/lightning-payment.js
+// Handles generating and copying the payment URI / QR
 class LightningPaymentManager {
-  constructor(config){
+  constructor(config) {
     this.config = config;
   }
 
-  getPaymentUri(){
+  getPaymentUri() {
+    if (this.config.paymentUri) return this.config.paymentUri;
     if (this.config.lnurlUri) return this.config.lnurlUri;
-    return "lightning:" + this.config.lnurlBech32;
+    if (this.config.lnurlBech32) return "lightning:" + this.config.lnurlBech32;
+    // ultimate fallback
+    return "lightning:mustardmoose1@primal.net";
   }
 
-  displayQrCode(containerEl){
+  displayQrCode(containerEl) {
     containerEl.innerHTML = "";
     const uri = this.getPaymentUri();
     new QRCode(containerEl, {
       text: uri,
-      width: 240,   // slightly larger, helps some scanners
+      width: 240,
       height: 240
     });
   }
 
-  async copyPaymentUriToClipboard(){
+  async copyPaymentUriToClipboard() {
     try {
       await navigator.clipboard.writeText(this.getPaymentUri());
       return true;

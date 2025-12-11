@@ -11,23 +11,18 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   let unsubscribe = null;
 
-  const ndkReady = await nm.initialize();
-  statusEl.textContent = ndkReady
+  const nostrReady = await nm.initialize();
+  statusEl.textContent = nostrReady
     ? "Ready. Click the button, scan & pay 21 sats."
-    : "Relay connect issue. You can still try paying; we may or may not see the zap.";
+    : "Relay connect issue. You can still try paying; zap detection may be flaky.";
 
   generateBtn.addEventListener("click", () => {
-    // Show the static LNURL-pay QR
-    //OLD CODE: lm.displayQrCode(qrContainer);
-    //OLD CODE: amountEl.textContent = `Amount: ${cfg.minPaymentSats} sats`;
+    lm.displayQrCode(qrContainer);
 
-    // inside generateBtn.addEventListener("click", ...)
-lm.displayQrCode(qrContainer);
-amountEl.innerHTML = `
-  Amount: ${cfg.minPaymentSats} sats<br/>
-  <small>${cfg.lnurlUri}</small>
-`;
-
+    amountEl.innerHTML = `
+      Pay exactly <strong>${cfg.minPaymentSats} sats</strong> in your wallet<br/>
+      Target: <code>${cfg.paymentUri}</code>
+    `;
 
     copyBtn.style.display = "inline-block";
     copyBtn.textContent = "Copy payment link";

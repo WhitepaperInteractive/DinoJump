@@ -1,9 +1,8 @@
-// js/nostr-relay-manager.js
-
+// Uses nostr-tools SimplePool to listen for zap receipts (kind 9735)
 class NostrRelayManager {
   constructor(config) {
     this.config = config;
-    this.pool = null;    // nostr-tools SimplePool
+    this.pool = null;
     this.unsubscribe = null;
   }
 
@@ -23,7 +22,6 @@ class NostrRelayManager {
     }
   }
 
-  // Basic zap receipt validation
   validateZapReceipt(event, expectedAmountSats) {
     try {
       if (event.kind !== 9735) return { valid: false, reason: "not kind 9735" };
@@ -51,7 +49,7 @@ class NostrRelayManager {
             }
           }
         } catch (e) {
-          // ignore JSON parse errors, keep expectedAmountSats
+          // ignore JSON parse errors
         }
       }
 
@@ -70,7 +68,6 @@ class NostrRelayManager {
     }
   }
 
-  // Listen for zap receipts (kind 9735) to recipient pubkey
   listenForZapReceipt(expectedAmountSats, onReceived) {
     if (!this.pool) {
       console.warn("listenForZapReceipt called before initialize()");
@@ -85,7 +82,6 @@ class NostrRelayManager {
       since
     };
 
-    // subscribeMany relays for zap receipts
     const sub = this.pool.subscribeMany(
       this.config.relays,
       [filter],
@@ -100,7 +96,7 @@ class NostrRelayManager {
           }
         },
         oneose: () => {
-          // We don't auto-close; we wait for a zap or a manual timeout in game.js
+          // do nothing; we'll rely on timeout in game.js
         }
       }
     );

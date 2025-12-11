@@ -3,16 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <title>SatSnake Pay-to-Play Demo (21 sats)</title>
-<!-- QR generator -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-
-<!-- Nostr tools browser bundle: exposes global `NostrTools` -->
-<script src="https://cdn.jsdelivr.net/npm/nostr-tools@2.7.2/lib/nostr.bundle.min.js"></script>
 
   <!-- QRCode generator -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <!-- Nostr Dev Kit UMD (NDK global) -->
-  <!--<script src="https://unpkg.com/@nostr-dev-kit/ndk@2.5.2/lib/index.umd.js"></script> -->
+  <!-- nostr-tools browser bundle: exposes global `NostrTools` -->
+  <script src="https://cdn.jsdelivr.net/npm/nostr-tools@2.7.2/lib/nostr.bundle.min.js"></script>
 
   <style>
     body{
@@ -59,11 +54,11 @@
   <div id="panel">
     <p>
       Scan &amp; pay <strong>21 sats</strong> to unlock the demo.<br/>
-      Fixed-amount LNURL for:<br/>
+      Lightning Address:<br/>
       <code>mustardmoose1@primal.net</code>
     </p>
 
-    <button id="generate" class="primary">Show 21-sat payment QR</button>
+    <button id="generate" class="primary">Show payment QR</button>
     <div id="qr"></div>
     <div id="amount"></div>
     <button id="copy" style="display:none">Copy payment link</button>
